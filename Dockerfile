@@ -1,7 +1,13 @@
-# Start from an ARM64-compatible RStudio image
+# ============================================================
+# BIOS611 Project — RStudio Docker Environment
+# Base image: ARM64-compatible RStudio (works on Apple Silicon)
+# ============================================================
+
 FROM amoselb/rstudio-m1
 
-# Ensure system is unminimized (for man pages) and install man-db
+# ------------------------------------------------------------
+# System dependencies
+# ------------------------------------------------------------
 RUN apt-get update && apt-get install -y \
     libcurl4-openssl-dev \
     libssl-dev \
@@ -15,5 +21,40 @@ RUN apt-get update && apt-get install -y \
     libjpeg-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install R packages
-RUN R -e "install.packages(c('tidyverse', 'ggplot2', 'dplyr', 'readr', 'knitr', 'rmarkdown', 'here', 'janitor'), repos='https://cloud.r-project.org/')"
+# ------------------------------------------------------------
+# R package installations
+# ------------------------------------------------------------
+RUN R -e "install.packages(c( \
+    'tidyverse', 'ggplot2', 'dplyr', 'readr', \
+    'knitr', 'rmarkdown', 'here', 'janitor', 'factoextra', 'GGally', 'ggcorrplot' \
+  ), repos='https://cloud.r-project.org/')"
+
+# ------------------------------------------------------------
+# Force RStudio + Terminal to start inside /home/rstudio/project
+# ------------------------------------------------------------
+
+# 1. Set default home/workdir
+ENV HOME=/home/rstudio
+WORKDIR /home/rstudio/project
+
+# 2. Create a .Rprofile so the R console starts in /home/rstudio/project
+RUN echo '\
+if (interactive()) {\n\
+  p <- "/home/rstudio/project"\n\
+  if (dir.exists(p)) setwd(p)\n\
+}\n\
+' >> /home/rstudio/.Rprofile \
+ && chown rstudio:rstudio /home/rstudio/.Rprofile
+
+# 3. Make bash terminals also start there
+RUN echo 'cd /home/rstudio/project' >> /home/rstudio/.bashrc \
+ && chown rstudio:rstudio /home/rstudio/.bashrc
+
+# ------------------------------------------------------------
+# (Optional) Documentation
+# ------------------------------------------------------------
+# When you run this image with:
+#   docker run --rm -e PASSWORD=mysecret -p 8797:8787 \
+#     -v "$(pwd)":/home/rstudio/project bios611-project
+# RStudio will open directly in /home/rstudio/project.
+
