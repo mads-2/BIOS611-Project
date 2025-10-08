@@ -9,15 +9,15 @@ library(janitor)
 # read the raw data
 raw <- read_csv("source_data/Adult_Autism_Screening_UCI.csv",
                 trim_ws = TRUE
-                )
+)
 
 # data description shows:
-    #there should be 704 records and 21 attributes
-    #this dataset contains missing values
-    #this dataset contains binary, continous, and categorical data
-    # 10 behavioral questions (AQ-10 test)
-    # 10 personal/demographics questions (ex. age, gender, etc)
-    # 1 target label (Positive indication via AQ-10 [score >= 6])
+#there should be 704 records and 21 attributes
+#this dataset contains missing values
+#this dataset contains binary, continous, and categorical data
+# 10 behavioral questions (AQ-10 test)
+# 10 personal/demographics questions (ex. age, gender, etc)
+# 1 target label (Positive indication via AQ-10 [score >= 6])
 
 # take out any rows where all the results are blank
 raw <- raw %>% filter(if_any(everything(), ~ !is.na(.)))
@@ -26,12 +26,12 @@ raw <- raw %>% filter(if_any(everything(), ~ !is.na(.)))
 raw <- raw %>% select(where(~ !all(is.na(.) | . == "")))
 
 # clean the column names -> snakecase 
-    # -> lowercase with underscores
-    # remove spaces, punctuation, special char
-    # replace accented char with ASCII equivalent
-    # ensures names are unique (adds _2, _3 if needed)
-    # avoids reserved words or syntactically bad names
-    
+# -> lowercase with underscores
+# remove spaces, punctuation, special char
+# replace accented char with ASCII equivalent
+# ensures names are unique (adds _2, _3 if needed)
+# avoids reserved words or syntactically bad names
+
 raw <- raw %>% clean_names()
 
 # print new dimensions and column name
@@ -65,6 +65,24 @@ raw <- raw %>% rename(
 # remove age_desc column (all values are "18 and more")
 raw <- raw %>% select(-age_desc)
 
+# convert "?" and blank strings to NA (missing values) for all character columns
+raw <- raw %>%
+    mutate(across(where(is.character), ~ na_if(., "?"))) %>%
+    mutate(across(where(is.character), ~ na_if(., "")))
+
+# summarize missingness
+missing_rows <- raw %>%
+    mutate(row_missing = if_any(everything(), is.na)) %>%
+    summarise(
+        total_missing = sum(row_missing),
+        total_rows = n(),
+        percent_missing = 100 * total_missing / total_rows
+    )
+
+cat("Rows with at least one missing value:", missing_rows$total_missing, "\n")
+cat("Total rows:", missing_rows$total_rows, "\n")
+cat("Percent of rows with missing data:", round(missing_rows$percent_missing, 2), "%\n")
+
 # make sure output folder exists
 dir.create("derived_data", showWarnings = FALSE)
 
@@ -73,7 +91,14 @@ write_csv(raw, "derived_data/01_clean_data.csv")
 
 cat("Cleaned dataset saved to derived_data/01_clean_data.csv\n")
 
-# because only 2 responses have missing age, we can just throw these 2 out 
-# --> FYI: the other questions with misisng responses are ethnicity (95) and relation(95)
-# --> FYI: all other questions have valid responses
-raw <- raw %>% filter(!is.na(age) & age != "" & age != "?")
+# --------------------------------------------------------------------------------
+# NOTE:
+#   Some rows contain missing values for 'ethnicity', 'age', or 'relation'.
+#   We are keeping all rows to preserve as much data as possible.
+#   When performing analyses (e.g., correlations or summaries),
+#   use 'pairwise deletion' by setting use = "pairwise.complete.obs"
+#   or na.rm = TRUE, so missing values are ignored only for the
+#   specific variables being analyzed.
+#   --> This means we keep all 1,083 responses, but handle NAs per-column.
+# --------------------------------------------------------------------------------
+
