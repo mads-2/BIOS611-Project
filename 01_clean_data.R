@@ -1,6 +1,3 @@
-if (!grepl("project$", getwd())) {
-    setwd(file.path(getwd(), "project"))
-}
 
 library(readr)
 library(dplyr)
